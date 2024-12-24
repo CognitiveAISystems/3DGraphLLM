@@ -28,7 +28,7 @@ seed=42
 use_location_token=False
 
 #llama_model_path="./vicuna-7b-v1.5"
-llama_model_path="../Chat-3D-v2/Meta-Llama-3-8B-Instruct"
+llama_model_path="./Meta-Llama-3-8B-Instruct"
 
 train_tag="scanrefer#obj_align#nr3d_caption#scan2cap#scanqa#sqa3d#multi3dref"
 val_tag="scan2cap#scanrefer#scanqa#sqa3d#multi3dref"

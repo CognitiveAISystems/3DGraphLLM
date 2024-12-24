@@ -21,7 +21,7 @@ val_file_dict = {
 
 # ========================= model ==========================
 model = dict(
-    llama_model_path="../Chat-3D-v2/Meta-Llama-3-8B-Instruct",
+    llama_model_path="./Meta-Llama-3-8B-Instruct",
     input_dim=1024,
     img_input_dim=1024,
     attr_dim=512,
