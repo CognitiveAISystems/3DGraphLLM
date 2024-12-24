@@ -2,6 +2,10 @@
 
 In this work, we propose 3DGraphLLM, a method for constructing a learnable representation of a 3D scene graph, which serves as input for LLMs to perform 3D vision-language tasks.
 
+<p align="center">
+<img src="assets/ga.png" width="80%">
+</p>
+
 ## News
 
 [2024.12] We release 3DGraphLLM [paper] [code]
