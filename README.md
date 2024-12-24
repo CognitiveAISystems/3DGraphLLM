@@ -8,7 +8,19 @@ In this work, we propose 3DGraphLLM, a method for constructing a learnable repre
 
 ## News
 
-[2024.12] We release 3DGraphLLM [paper] [code]
+[2024.12] We release 3DGraphLLM [paper] [code](https://github.com/CognitiveAISystems/3DGraphLLM)
+
+### 🔥 Semantic relations boost LLM performance on 3D Referred Object Grounding and Dense Scene Captioning tasks
+
+
+
+  |      	| [ScanRefer](https://github.com/daveredrum/ScanRefer) 	|         	| [Multi3dRefer](https://github.com/3dlg-hcvc/M3DRef-CLIP)	|        	|  [Scan2Cap](https://github.com/daveredrum/Scan2Cap) 	|            	| [ScanQA](https://github.com/ATR-DBI/ScanQA)  	|        	| [SQA3D](https://github.com/SilongYong/SQA3D) 	|
+  |:----:	|:---------:	|:-------:	|:------:	|:------:	|:---------:	|:----------:	|:------------:	|:------:	|:-----:	|
+  |      	|  Acc@0.25 	| Acc@0.5 	|    F1@0.25   	| F1@0.5 	|  CIDEr@0.5 	| B-4@0.5 	| CIDEr 	| B-4 	|    EM  	|
+  | [Chat-Scene](https://github.com/ZzZZCHS/Chat-Scene/tree/dev) 	|    55.5   	|   50.2  	|  57.1 	|  52.3  	|    77.1  	|    36.3    	|     **87.7**      	|    **14.3**  	|   <ins>54.6</ins>   	|
+  | <ins>3DGraphLLM Vicuna-1.5 </ins> 	|   <ins>57.0</ins>    	|  <ins>51.3</ins>  	|  <ins>60.1</ins>  	|  <ins>55.4</ins>  	|   <ins>81.2</ins>    	|    <ins>36.3</ins>    	|    <ins>87.6</ins>     	|  12.1 	| 53.1  	|
+   **3DGraphLLM LLAMA3-8B**	|   **60.2**    	|  **54.6**   	|  **63.0**  	|  **58.2**  	|   **82.9**    	|    **37.8**    	|     83.1     	|  <ins>12.5</ins>   	| **55.2**  	|
+
 
 ## 🔨 Preparation
 
