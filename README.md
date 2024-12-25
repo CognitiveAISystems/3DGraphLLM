@@ -8,7 +8,7 @@ In this work, we propose 3DGraphLLM, a method for constructing a learnable repre
 
 ## News
 
-[2024.12] We release 3DGraphLLM [paper] [code](https://github.com/CognitiveAISystems/3DGraphLLM)
+[2024.12] We release 3DGraphLLM [paper](https://arxiv.org/abs/2412.18450) [code](https://github.com/CognitiveAISystems/3DGraphLLM)
 
 ### 🔥 Semantic relations boost LLM performance on 3D Referred Object Grounding and Dense Scene Captioning tasks
 
@@ -103,6 +103,17 @@ If you have any questions about the project, please open an issue in this reposi
 
 If you find this work helpful, please consider citing our work as:
 
+```
+@misc{zemskova20243dgraphllm,
+      title={3DGraphLLM: Combining Semantic Graphs and Large Language Models for 3D Scene Understanding}, 
+      author={Tatiana Zemskova and Dmitry Yudin},
+      year={2024},
+      eprint={2412.18450},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2412.18450}, 
+}
+```
 
 
 ## 😊 Acknowledgement
