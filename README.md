@@ -1,5 +1,8 @@
 # 3DGraphLLM
 
+[![arXiv](https://img.shields.io/badge/arXiv-2409.00134-b31b1b.svg)](https://arxiv.org/abs/2412.18450)
+[![Huggingace](https://img.shields.io/badge/Weights-3DGraphLLM?logo=HuggingFace&color=blue)](https://huggingface.co/wingrune/3DGraphLLM)
+
 In this work, we propose 3DGraphLLM, a method for constructing a learnable representation of a 3D scene graph, which serves as input for LLMs to perform 3D vision-language tasks.
 
 <p align="center">
@@ -80,7 +83,7 @@ conda install -c conda-forge openjdk
 
 - Inference
   
-  - Modify [run.sh](scripts/run.sh): We provide the pretrained checkpoint in [Yandex Disk](https://disk.yandex.ru/d/fTz0uzDNHjI4mw)
+  - Modify [run.sh](scripts/run.sh):
   
     ```python
     val_tag="scanrefer#scan2cap#scanqa#sqa3d#multi3dref"
