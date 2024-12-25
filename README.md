@@ -1,6 +1,6 @@
 # 3DGraphLLM
 
-[![arXiv](https://img.shields.io/badge/arXiv-2409.00134-b31b1b.svg)](https://arxiv.org/abs/2412.18450)
+[![arXiv](https://img.shields.io/badge/arXiv-2412.18450-b31b1b.svg)](https://arxiv.org/abs/2412.18450)
 [![Huggingace](https://img.shields.io/badge/Weights-3DGraphLLM?logo=HuggingFace&color=blue)](https://huggingface.co/wingrune/3DGraphLLM)
 
 In this work, we propose 3DGraphLLM, a method for constructing a learnable representation of a 3D scene graph, which serves as input for LLMs to perform 3D vision-language tasks.
