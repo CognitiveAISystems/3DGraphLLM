@@ -12,6 +12,7 @@ In this work, we propose 3DGraphLLM, a method for constructing a learnable repre
 ## News
 
 [2024.12] We release 3DGraphLLM pre-training on GT instance segmentation scene graphs
+
 [2024.12] We release 3DGraphLLM [paper](https://arxiv.org/abs/2412.18450) [code](https://github.com/CognitiveAISystems/3DGraphLLM)
 
 ### 🔥 Semantic relations boost LLM performance on 3D Referred Object Grounding and Dense Scene Captioning tasks
