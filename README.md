@@ -11,6 +11,7 @@ In this work, we propose 3DGraphLLM, a method for constructing a learnable repre
 
 ## News
 
+[2024.12] We release 3DGraphLLM pre-training on GT instance segmentation scene graphs
 [2024.12] We release 3DGraphLLM [paper](https://arxiv.org/abs/2412.18450) [code](https://github.com/CognitiveAISystems/3DGraphLLM)
 
 ### 🔥 Semantic relations boost LLM performance on 3D Referred Object Grounding and Dense Scene Captioning tasks
@@ -55,8 +56,8 @@ conda install -c conda-forge openjdk
 
 ## 🤖 Training and Inference
 
-- Training
-  - Modify [run.sh](scripts/run.sh):
+- Pre-training on GT instance segmentation scene graphs.
+  - Modify [run_gt_pretrain.sh](scripts/run_gt_pretrain.sh):
     ```python
     train_tag="scanrefer#scan2cap#scanqa#sqa3d#multi3dref#nr3d_caption#obj_align"
     val_tag="scanrefer#scan2cap#scanqa#sqa3d#multi3dref"
@@ -78,6 +79,15 @@ conda install -c conda-forge openjdk
       - `obj_align`: A dataset originated from ScanRefer to align the object identifiers with object tokens.
 
     </details>
+  - Run: `bash scripts/run_gt_pretrain.sh`
+
+- Training
+  - Modify [run.sh](scripts/run.sh):
+    ```python
+    train_tag="scanrefer#scan2cap#scanqa#sqa3d#multi3dref#nr3d_caption#obj_align"
+    val_tag="scanrefer#scan2cap#scanqa#sqa3d#multi3dref"
+    evaluate=False
+    ```
   - Run: `bash scripts/run.sh`
 
 

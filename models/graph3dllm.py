@@ -81,6 +81,7 @@ class Graph3DLLM(nn.Module):
         self.fuse_with_id = config.model.fuse_with_id
         self.use_location_token = config.model.use_location_token
         self.knn = config.model.knn
+        self.gt_pretrain = config.model.gt_pretrain
 
         self.debug = config.debug
         if not self.debug:
@@ -286,9 +287,8 @@ class Graph3DLLM(nn.Module):
         dist_attn = torch.nn.functional.softmax(-dist, dim=-1)
         return dist_attn
 
-    def get_object_list_embed(self, embed_obj, embed_img, embed_scene, scene_mask, obj_id, assigned_ids,               proj_edge_embed, scene_locs, foreground_ids):
+    def get_object_list_embed(self, embed_obj, embed_img, embed_scene, scene_mask, obj_id, assigned_ids, proj_edge_embed, scene_locs, foreground_ids):
         valid_ids = torch.where(scene_mask)[0].tolist()
-        foreground_ids = foreground_ids.cuda()
         if self.config.model.use_lora:
             objid_embeds = self.llama_model.model.model.embed_tokens.weight[self.objid_start_idx:self.objid_end_idx] # max_obj_num * 4096
         else:
@@ -296,60 +296,63 @@ class Graph3DLLM(nn.Module):
 
         assigned_ids = assigned_ids[valid_ids]
         selected_objid_embeds = objid_embeds[valid_ids]
+        foreground_ids = foreground_ids.to(selected_objid_embeds.device)
+        if self.gt_pretrain:
+            foreground_ids = foreground_ids[valid_ids]
         if self.knn > 0:
             object_list_embed = torch.zeros((selected_objid_embeds.shape[0] * (3 * self.knn + 2), selected_objid_embeds.shape[1]), dtype=selected_objid_embeds.dtype, device=selected_objid_embeds.device)
-
             edges_assigned_ids = []
             foreground_assigned_ids = []
             for assigned_id in assigned_ids:
                 if assigned_id in foreground_ids:
-                    foreground_assigned_ids.append(assigned_id)
+                    foreground_assigned_ids.append(int(assigned_id))
                 for nn in range(self.knn):
-                    edges_assigned_ids.append(self.knn*assigned_id+nn)
+                    edges_assigned_ids.append(self.knn*int(assigned_id)+nn)
 
-            #print(proj_edge_embed[26,:5])
-            #print(proj_edge_embed[27,:5])
-            proj_edge_embed = proj_edge_embed[edges_assigned_ids]
-            pairwise_locs = einops.repeat(scene_locs[assigned_ids, :3], 'l d -> l 1 d') \
-                - einops.repeat(scene_locs[foreground_assigned_ids, :3], 'l d -> 1 l d')
-            pairwise_dists = torch.sqrt(torch.sum(pairwise_locs ** 2, 2) + 1e-10)
+            if not self.gt_pretrain:
+                pairwise_locs = einops.repeat(scene_locs[assigned_ids, :3], 'l d -> l 1 d') \
+                    - einops.repeat(scene_locs[foreground_assigned_ids, :3], 'l d -> 1 l d')
+                pairwise_dists = torch.sqrt(torch.sum(pairwise_locs ** 2, 2) + 1e-10)
+            else:
+                pairwise_locs = einops.repeat(scene_locs[assigned_ids, :3], 'l d -> l 1 d') \
+                    - einops.repeat(scene_locs[assigned_ids, :3], 'l d -> 1 l d')
+                pairwise_dists = torch.sqrt(torch.sum(pairwise_locs ** 2, 2) + 1e-10)
 
             # mask small pairwise distances with large values 
             MINIMUM_DISTANCE = 0.01
             pairwise_dists[pairwise_dists < MINIMUM_DISTANCE] = 100.0
             obj_num = selected_objid_embeds.shape[0]
-            
-            topk_values, topk_indices = torch.topk(pairwise_dists, self.knn, dim=1,  largest=False)
-            #print(pairwise_dists.shape)
-            #print(topk_indices[0,:])
-            #print(topk_indices[0,:].shape)
-            #print(torch.tensor(foreground_assigned_ids)[topk_indices[0,0].cpu()])
-            #print(assigned_ids)
-            #print(proj_edge_embed[0,:5])
-            #print(proj_edge_embed[1,:5])
-            #exit()
-            object_list_embed[0::(3*self.knn+2), :] = selected_objid_embeds.to(object_list_embed.dtype)
-            object_list_embed[1::(3*self.knn+2), :] = embed_img[assigned_ids]
-            for nn in range(self.knn):
-                object_list_embed[2 + 3*nn::(3*self.knn+2), :] = embed_obj[assigned_ids]
-                object_list_embed[3 + 3*nn::(3*self.knn+2), :] = proj_edge_embed[nn::self.knn,:].to(object_list_embed.dtype)
-                object_list_embed[4 + 3*nn::(3*self.knn+2), :] = embed_obj[torch.tensor(foreground_assigned_ids)[topk_indices[:,nn].cpu()]].to(object_list_embed.dtype)
-            #for j in range(obj_num):
-                #print(torch.norm(object_list_embed[j*obj_num] - selected_objid_embeds[j]))
-           #     print(j)
-           #     assert torch.norm(object_list_embed[j*(3*self.knn+2)] - selected_objid_embeds[j]) < 0.001
-                #print(torch.norm(object_list_embed[j*(3*self.knn+2) + 1] - embed_img[assigned_ids][j]))
-           #     assert torch.norm(object_list_embed[j*(3*self.knn+2) + 1] - embed_img[assigned_ids][j]) < 0.001
-           #     for nn in range(self.knn):
-           #         assert torch.norm(object_list_embed[j*(3*self.knn+2) + 3*nn + 2] - embed_obj[assigned_ids][j]) < 0.001
-           #         assert torch.norm(object_list_embed[j*(3*self.knn+2) + 3*nn + 3] - proj_edge_embed[j*(self.knn)+nn,:]) < 0.001
-           #         assert torch.norm(object_list_embed[j*(3*self.knn+2) + 3*nn + 4] - embed_obj[torch.tensor(foreground_assigned_ids)[topk_indices[j,nn].cpu()]]) < 0.001
+            if self.knn < obj_num:
+                topk_values, topk_indices = torch.topk(pairwise_dists, self.knn, dim=1,  largest=False)
+    
+                object_list_embed[0::(3*self.knn+2), :] = selected_objid_embeds.to(object_list_embed.dtype)
+                object_list_embed[1::(3*self.knn+2), :] = embed_img[assigned_ids]
+                for nn in range(self.knn):
+                    object_list_embed[2 + 3*nn::(3*self.knn+2), :] = embed_obj[assigned_ids]
+                    if max(edges_assigned_ids) < proj_edge_embed.shape[0]:
+                        proj_edge_embed = proj_edge_embed[edges_assigned_ids]
+                        object_list_embed[3 + 3*nn::(3*self.knn+2), :] = proj_edge_embed[nn::self.knn,:].to(object_list_embed.dtype)
+                    object_list_embed[4 + 3*nn::(3*self.knn+2), :] = embed_obj[torch.tensor(foreground_assigned_ids)[topk_indices[:,nn].cpu()]].to(object_list_embed.dtype)
+            else:
+                print(obj_num)
+                topk_values, topk_indices = torch.topk(pairwise_dists, obj_num, dim=0,  largest=False)
+                print(topk_values.shape)
+
+                for j in range(obj_num):
+                    object_list_embed[j*(3*obj_num+2)] = selected_objid_embeds[j].to(object_list_embed.dtype)
+                    object_list_embed[j*(3*obj_num+2) + 1] = embed_img[assigned_ids][j].to(object_list_embed.dtype)
+                    for nn in range(obj_num-1):
+                        object_list_embed[j*(3*obj_num+2) + 3*nn + 2] = embed_obj[assigned_ids[j]].to(object_list_embed.dtype)
+                        if max(edges_assigned_ids) < proj_edge_embed.shape[0]:
+                            proj_edge_embed = proj_edge_embed[edges_assigned_ids]
+                            object_list_embed[j*(3*obj_num+2) + 3*nn + 3] = proj_edge_embed[j*(obj_num-1)+nn,:]
+                        object_list_embed[j*(3*obj_num+2) + 3*nn + 4] = embed_obj[assigned_ids[topk_indices[j,nn]]].to(object_list_embed.dtype)
+
         else:
             object_list_embed = torch.zeros((selected_objid_embeds.shape[0] * 3, selected_objid_embeds.shape[1]), dtype=selected_objid_embeds.dtype, device=selected_objid_embeds.device)
             object_list_embed[0::3, :] = selected_objid_embeds
             object_list_embed[1::3, :] = embed_obj[assigned_ids]
             object_list_embed[2::3, :] = embed_img[assigned_ids]
-        #exit()
         return object_list_embed
 
     def get_min_max_coord(self, xyz, scene_mask):

@@ -279,7 +279,8 @@ model = dict(
     fuse_with_id=False,
     use_objid=True,
     use_location_token=False,
-    knn=2
+    knn=2,
+    gt_pretrain=False
 )
 
 lora = dict(
