@@ -68,7 +68,7 @@ conda install -c conda-forge openjdk
     <details>
     <summary> Explanation of "train_tag" and "val_tag" </summary>
 
-    - Use `#` to seperate different datasets
+    - Use `#` to separate different datasets
 
     - Datasets:
       - `scanrefer`: [ScanRefer](https://github.com/daveredrum/ScanRefer) Dataset
