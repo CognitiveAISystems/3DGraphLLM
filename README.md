@@ -88,6 +88,7 @@ conda install -c conda-forge openjdk
     train_tag="scanrefer#scan2cap#scanqa#sqa3d#multi3dref#nr3d_caption#obj_align"
     val_tag="scanrefer#scan2cap#scanqa#sqa3d#multi3dref"
     evaluate=False
+    pretrained_path=outputs/llama3-8b-gt-pretrain-2/ckpt_00_28927.pth
     ```
   - Run: `bash scripts/run.sh`
 
