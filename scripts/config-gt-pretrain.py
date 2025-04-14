@@ -159,7 +159,11 @@ model = dict(
     use_objid=True,
     use_location_token=False,
     knn=2,
-    gt_pretrain=True
+    bbox_embed=False,
+    gt_pretrain=True,
+    nms=True,
+    nn_distance=True,
+    max_knn=2
 )
 
 lora = dict(

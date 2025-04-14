@@ -81,14 +81,20 @@ class Graph3DLLM(nn.Module):
         self.fuse_with_id = config.model.fuse_with_id
         self.use_location_token = config.model.use_location_token
         self.knn = config.model.knn
+        self.max_knn = config.model.max_knn
+        self.bbox_embed = config.model.bbox_embed
         self.gt_pretrain = config.model.gt_pretrain
+        self.nms = config.model.nms
+        self.nn_distance = config.model.nn_distance
 
         self.debug = config.debug
         if not self.debug:
             logger.info('Loading LLaMA')
-            #self.llama_tokenizer = LlamaTokenizer.from_pretrained(llama_model_path, use_fast=False, legacy=False)
-            self.llama_tokenizer = AutoTokenizer.from_pretrained(llama_model_path, use_fast=False )
-            # self.llama_tokenizer.pad_token = self.llama_tokenizer.eos_token
+            if "vicuna" in llama_model_path:
+                self.llama_tokenizer = LlamaTokenizer.from_pretrained(llama_model_path, use_fast=False, legacy=False)
+            else:
+                self.llama_tokenizer = AutoTokenizer.from_pretrained(llama_model_path, use_fast=False )
+                self.llama_tokenizer.pad_token = self.llama_tokenizer.eos_token
             if self.low_resource:
                 self.llama_model = LlamaForCausalLM.from_pretrained(
                     llama_model_path,
@@ -98,18 +104,22 @@ class Graph3DLLM(nn.Module):
                     attn_implementation="flash_attention_2"
                 )
             else:
-                #self.llama_model = LlamaForCausalLM.from_pretrained(
-                #    llama_model_path,
-                #    torch_dtype=torch.bfloat16,
-                #    attn_implementation="flash_attention_2"
-                #)
-                self.llama_model = AutoModelForCausalLM.from_pretrained(
-                    llama_model_path,
-                    torch_dtype=torch.bfloat16,
-                    #device_map="cuda:1"
-                    #attn_implementation="flash_attention_2",
-                )
-                self.llama_tokenizer.pad_token = self.llama_tokenizer.eos_token
+                if "vicuna" in llama_model_path:
+                    self.llama_model = LlamaForCausalLM.from_pretrained(
+                        llama_model_path,
+                        torch_dtype=torch.bfloat16,
+                        #attn_implementation="flash_attention_2"
+                    )
+                    self.llama3=False
+                else:
+                    self.llama3=False
+                    self.llama_model = AutoModelForCausalLM.from_pretrained(
+                        llama_model_path,
+                        torch_dtype=torch.bfloat16,
+                        #device_map="cuda:1"
+                        attn_implementation="flash_attention_2",
+                    )
+                    self.llama_tokenizer.pad_token = self.llama_tokenizer.eos_token
             # print(torch.cuda.memory_allocated(device="cuda:0")/1e9)
             # self.llama_model = self.llama_model.to("cuda")
             # print(torch.cuda.memory_allocated(device="cuda:0")/1e9)
@@ -196,13 +206,30 @@ class Graph3DLLM(nn.Module):
             nn.GELU(),
             nn.Linear(self.llama_dim, self.llama_dim)
         )
-        self.edge_proj = nn.Sequential(
-            nn.Linear(512, self.llama_dim),
-            nn.GELU(),
-            nn.Dropout(0.1),
-            nn.LayerNorm(self.llama_dim),
-            nn.Linear(self.llama_dim, self.llama_dim)
-        )
+
+        if self.bbox_embed:
+            self.coord_proj = nn.Sequential(
+                nn.Linear(6, 512),
+                # nn.ReLU(),
+                # nn.LayerNorm(self.attr_dim),
+                # nn.Dropout(mlp_dropout)
+            )
+    
+            self.edge_proj = nn.Sequential(
+                nn.Linear(2*self.input_dim+1024, self.llama_dim),
+                nn.GELU(),
+                nn.Dropout(0.1),
+                nn.LayerNorm(self.llama_dim),
+                nn.Linear(self.llama_dim, self.llama_dim)
+            )
+        else:
+            self.edge_proj = nn.Sequential(
+                nn.Linear(512, self.llama_dim),
+                nn.GELU(),
+                nn.Dropout(0.1),
+                nn.LayerNorm(self.llama_dim),
+                nn.Linear(self.llama_dim, self.llama_dim)
+            )
         if not self.train_img_proj:
             for p in self.object_img_proj.parameters():
                 p.requires_grad = False
@@ -275,8 +302,8 @@ class Graph3DLLM(nn.Module):
         return embeds
 
     def encode_object_feat(self, feat, img_feat, locs):
-        feat = torch.nn.functional.normalize(feat, dim=-1)
-        img_feat = torch.nn.functional.normalize(img_feat, dim=-1)
+        feat = torch.nan_to_num(torch.nn.functional.normalize(feat, dim=-1))
+        img_feat = torch.nan_to_num(torch.nn.functional.normalize(img_feat, dim=-1))
         return feat, img_feat
     
     @staticmethod
@@ -287,7 +314,7 @@ class Graph3DLLM(nn.Module):
         dist_attn = torch.nn.functional.softmax(-dist, dim=-1)
         return dist_attn
 
-    def get_object_list_embed(self, embed_obj, embed_img, embed_scene, scene_mask, obj_id, assigned_ids, proj_edge_embed, scene_locs, foreground_ids):
+    def get_object_list_embed(self, embed_obj, embed_img, embed_scene, scene_mask, obj_id, assigned_ids,               proj_edge_embed, scene_locs, foreground_ids, scene_feat):
         valid_ids = torch.where(scene_mask)[0].tolist()
         if self.config.model.use_lora:
             objid_embeds = self.llama_model.model.model.embed_tokens.weight[self.objid_start_idx:self.objid_end_idx] # max_obj_num * 4096
@@ -296,20 +323,23 @@ class Graph3DLLM(nn.Module):
 
         assigned_ids = assigned_ids[valid_ids]
         selected_objid_embeds = objid_embeds[valid_ids]
+
         foreground_ids = foreground_ids.to(selected_objid_embeds.device)
+        #print(foreground_ids.shape, valid_ids.shape)
         if self.gt_pretrain:
             foreground_ids = foreground_ids[valid_ids]
         if self.knn > 0:
             object_list_embed = torch.zeros((selected_objid_embeds.shape[0] * (3 * self.knn + 2), selected_objid_embeds.shape[1]), dtype=selected_objid_embeds.dtype, device=selected_objid_embeds.device)
+
             edges_assigned_ids = []
             foreground_assigned_ids = []
             for assigned_id in assigned_ids:
                 if assigned_id in foreground_ids:
                     foreground_assigned_ids.append(int(assigned_id))
                 for nn in range(self.knn):
-                    edges_assigned_ids.append(self.knn*int(assigned_id)+nn)
+                    edges_assigned_ids.append(self.max_knn*int(assigned_id)+nn)
 
-            if not self.gt_pretrain:
+            if not self.gt_pretrain and self.nms:
                 pairwise_locs = einops.repeat(scene_locs[assigned_ids, :3], 'l d -> l 1 d') \
                     - einops.repeat(scene_locs[foreground_assigned_ids, :3], 'l d -> 1 l d')
                 pairwise_dists = torch.sqrt(torch.sum(pairwise_locs ** 2, 2) + 1e-10)
@@ -318,21 +348,30 @@ class Graph3DLLM(nn.Module):
                     - einops.repeat(scene_locs[assigned_ids, :3], 'l d -> 1 l d')
                 pairwise_dists = torch.sqrt(torch.sum(pairwise_locs ** 2, 2) + 1e-10)
 
-            # mask small pairwise distances with large values 
-            MINIMUM_DISTANCE = 0.01
-            pairwise_dists[pairwise_dists < MINIMUM_DISTANCE] = 100.0
+            # mask small pairwise distances with large values
+            if self.gt_pretrain or self.nn_distance:
+                MINIMUM_DISTANCE = 0.01
+                pairwise_dists[pairwise_dists < MINIMUM_DISTANCE] = 100.0
+                NEIGHBOR_SHIFT = 0
+            else:
+                NEIGHBOR_SHIFT = 1
             obj_num = selected_objid_embeds.shape[0]
             if self.knn < obj_num:
-                topk_values, topk_indices = torch.topk(pairwise_dists, self.knn, dim=1,  largest=False)
+                topk_values, topk_indices = torch.topk(pairwise_dists, self.knn+NEIGHBOR_SHIFT, dim=1,  largest=False)
     
                 object_list_embed[0::(3*self.knn+2), :] = selected_objid_embeds.to(object_list_embed.dtype)
                 object_list_embed[1::(3*self.knn+2), :] = embed_img[assigned_ids]
                 for nn in range(self.knn):
                     object_list_embed[2 + 3*nn::(3*self.knn+2), :] = embed_obj[assigned_ids]
                     if max(edges_assigned_ids) < proj_edge_embed.shape[0]:
+                        #print(proj_edge_embed.shape)
+                        #print(len(edges_assigned_ids))
                         proj_edge_embed = proj_edge_embed[edges_assigned_ids]
                         object_list_embed[3 + 3*nn::(3*self.knn+2), :] = proj_edge_embed[nn::self.knn,:].to(object_list_embed.dtype)
-                    object_list_embed[4 + 3*nn::(3*self.knn+2), :] = embed_obj[torch.tensor(foreground_assigned_ids)[topk_indices[:,nn].cpu()]].to(object_list_embed.dtype)
+                    if not self.gt_pretrain and self.nms:
+                        object_list_embed[4 + 3*nn::(3*self.knn+2), :] = embed_obj[torch.tensor(foreground_assigned_ids)[topk_indices[:,nn+NEIGHBOR_SHIFT].cpu()]].to(object_list_embed.dtype)
+                    else:
+                        object_list_embed[4 + 3*nn::(3*self.knn+2), :] = embed_obj[torch.tensor(assigned_ids)[topk_indices[:,nn+NEIGHBOR_SHIFT].cpu()]].to(object_list_embed.dtype)
             else:
                 print(obj_num)
                 topk_values, topk_indices = torch.topk(pairwise_dists, obj_num, dim=0,  largest=False)
@@ -346,7 +385,7 @@ class Graph3DLLM(nn.Module):
                         if max(edges_assigned_ids) < proj_edge_embed.shape[0]:
                             proj_edge_embed = proj_edge_embed[edges_assigned_ids]
                             object_list_embed[j*(3*obj_num+2) + 3*nn + 3] = proj_edge_embed[j*(obj_num-1)+nn,:]
-                        object_list_embed[j*(3*obj_num+2) + 3*nn + 4] = embed_obj[assigned_ids[topk_indices[j,nn]]].to(object_list_embed.dtype)
+                        object_list_embed[j*(3*obj_num+2) + 3*nn + 4] = embed_obj[assigned_ids[topk_indices[j,nn+NEIGHBOR_SHIFT]]].to(object_list_embed.dtype)
 
         else:
             object_list_embed = torch.zeros((selected_objid_embeds.shape[0] * 3, selected_objid_embeds.shape[1]), dtype=selected_objid_embeds.dtype, device=selected_objid_embeds.device)
@@ -364,12 +403,24 @@ class Graph3DLLM(nn.Module):
         return mins, maxs
 
     def forward_train(self, scene_feat, scene_img_feat, scene_locs, scene_mask, obj_ids, assigned_ids, scene_gnn_feats, foreground_ids, questions, answers, is_eval=False, **kwargs):
+        #print(scene_feat.shape)
+        #input()
+        #logger.info("Got into forward pass")
         object_embed, object_img_embed = self.encode_object_feat(scene_feat, scene_img_feat, scene_locs)
+
+        #logger.info("encode features")
         device = object_embed.device
         batch_size = object_embed.shape[0]
         proj_object_embed = self.object_proj(object_embed)
         proj_object_img_embed = self.object_img_proj(object_img_embed)
-        proj_edge_embed = self.edge_proj(scene_gnn_feats)
+
+        #logger.info("projected features")
+
+        if not self.bbox_embed:
+            scene_gnn_feats = torch.nan_to_num(torch.nn.functional.normalize(scene_gnn_feats, dim=-1))
+            proj_edge_embed = self.edge_proj(scene_gnn_feats)
+        #logger.info("proj_edge_embed features")
+        
         if self.add_pos_emb:
             mins, maxs = self.get_min_max_coord(scene_locs[:, :, :3], scene_mask)
             pos_embed = self.pos_embedding(scene_locs[:, :, :3], input_range=[mins, maxs]) / 10
@@ -391,11 +442,13 @@ class Graph3DLLM(nn.Module):
         
         input_embed_list, attn_list, target_list = [], [], []
         max_seq_len = 0
+        #logger.info("before p_0_embed")
         p_0_embed = self.p_0_embed.to(device)
         p_1_embed = self.p_1_embed.to(device)
         object_list_intervals = []
-
+        #logger.info("after p_0_embed")
         for i, question in enumerate(questions):
+            #logger.info("Got into questions loop")
             prompt = f"{question} {self.role[1]}: "
             prompt_embed = self.get_text_emb(prompt, device=device).squeeze(0)
             object_list_embed = self.get_object_list_embed(
@@ -405,13 +458,16 @@ class Graph3DLLM(nn.Module):
                 scene_mask[i],
                 obj_ids[i],
                 assigned_ids[i],             
-                proj_edge_embed[i],
+                proj_edge_embed[i] if not self.bbox_embed else None,
                 scene_locs[i],
                 foreground_ids[i],
+                scene_feat[i]
             )
+            #logger.info("prepared object list")
             # object_list_embed = nclamp(object_list_embed, min=-0.05, max=0.05)
             object_list_intervals.append((p_0_embed.shape[0], p_0_embed.shape[0] + object_list_embed.shape[0]))
             wrapped_embed = torch.cat([p_0_embed, object_list_embed, p_1_embed, prompt_embed], dim=0)
+            #print(p_0_embed.shape, object_list_embed.shape, p_1_embed.shape, prompt_embed.shape)
             wrapped_attn = torch.ones(wrapped_embed.size()[:-1], dtype=torch.long).to(wrapped_embed.device)
             empty_target = (
                 torch.ones(wrapped_attn.shape[0], dtype=torch.long).to(device).fill_(-100)
@@ -434,11 +490,15 @@ class Graph3DLLM(nn.Module):
             target_list.append(target)
             max_seq_len = max(max_seq_len, target.shape[0])
         
-        max_seq_len = min(2560, max_seq_len)
+        #print(max_seq_len)
+        #max_seq_len = min(1268, max_seq_len)
+        #max_seq_len = min(1368, max_seq_len)
+        max_seq_len = min(2502, max_seq_len)
 
         def pad_and_trim(tensor_list, max_len, batch_first=True, padding_value=0):
             padded = pad_sequence(tensor_list, batch_first=batch_first, padding_value=padding_value)
             if padded.shape[1] > max_len:
+                print("padded_sequence")
                 return padded[:, :max_len]
             return padded
         
@@ -459,7 +519,9 @@ class Graph3DLLM(nn.Module):
         
         # label_weights = torch.ones(self.llama_model.config.vocab_size, device=device)
         # label_weights[self.objid_start_idx:self.objid_end_idx] = 10
-
+        #torch.distributed.barrier()
+        #logger.info(f"Rank {dist.get_rank()} passed barrier")
+        #logger.info("Reached llama forward pass")
         with self.maybe_autocast():
             outputs = self.llama_model(
                 inputs_embeds=input_embeds,
@@ -481,20 +543,23 @@ class Graph3DLLM(nn.Module):
     def evaluate(self, scene_feat, scene_img_feat, scene_locs, scene_mask, custom_prompt, obj_ids, assigned_ids, scene_gnn_feats, foreground_ids, is_eval=True, **kwargs):
         object_embed, object_img_embed = self.encode_object_feat(scene_feat, scene_img_feat, scene_locs)
         device = object_embed.device
-        batch_size, obj_num = object_embed.shape[:2]
+        batch_size = object_embed.shape[0]
         proj_object_embed = self.object_proj(object_embed)
         proj_object_img_embed = self.object_img_proj(object_img_embed)
 
-        #print(scene_gnn_feats[0, 26, :5])
-        #print(scene_gnn_feats[0, 27, :5])
-        proj_edge_embed = self.edge_proj(scene_gnn_feats)
+        if not self.bbox_embed:
+            scene_gnn_feats = torch.nn.functional.normalize(scene_gnn_feats, dim=-1)
+            proj_edge_embed = self.edge_proj(scene_gnn_feats)
+        
         if self.add_pos_emb:
             mins, maxs = self.get_min_max_coord(scene_locs[:, :, :3], scene_mask)
             pos_embed = self.pos_embedding(scene_locs[:, :, :3], input_range=[mins, maxs]) / 10
             proj_pos_embed = self.pos_proj(pos_embed)
             proj_object_embed = proj_object_embed + proj_pos_embed
             proj_object_img_embed = proj_object_img_embed + proj_pos_embed
-        if self.add_scene_token:
+
+        proj_scene_embed = None
+        if self.add_scene_token:  # remember to change the evaluate 
             # if self.add_img_token:
             #     object_embed = object_embed + object_img_embed
             obj_embed = self.scene_init_proj(object_embed)
@@ -518,10 +583,11 @@ class Graph3DLLM(nn.Module):
                 proj_scene_embed[i] if self.add_scene_token else None, 
                 scene_mask[i],
                 obj_ids[i],
-                assigned_ids[i],
-                proj_edge_embed[i],
+                assigned_ids[i],             
+                proj_edge_embed[i] if not self.bbox_embed else None,
                 scene_locs[i],
-                foreground_ids[i]
+                foreground_ids[i],
+                scene_feat[i]
             )
             object_list_embed = object_list_embed.unsqueeze(0)
             wrapped_embed = torch.cat([p_0_embed, object_list_embed, p_1_embed, prompt_embed], dim=1)
@@ -533,13 +599,16 @@ class Graph3DLLM(nn.Module):
                 attention_mask = attention_mask[None, None, :, :].expand(1, 1, -1, -1).clone()
                 st, ed = p_0_embed.shape[1], p_0_embed.shape[1] + object_list_embed.shape[1]
                 attention_mask[:, :, st:ed, st:ed] = 1.0
+            #stop_words_ids = [torch.tensor([835]).to(wrapped_embed.device),
+            #                  torch.tensor([2277, 29937]).to(wrapped_embed.device)]
             stop_words_ids = [torch.tensor([ 14711]).to(wrapped_embed.device), torch.tensor([198,  14711]).to(wrapped_embed.device), torch.tensor([82, 29]).to(wrapped_embed.device), torch.tensor([524]).to(wrapped_embed.device)]
-            
+
             stopping_criteria = StoppingCriteriaList([StoppingCriteriaSub(stops=stop_words_ids)])
             with self.maybe_autocast():
                 outputs = self.llama_model.generate(
                     inputs_embeds=wrapped_embed,
                     max_new_tokens=self.max_txt_len,
+                    #max_new_tokens=2,
                     stopping_criteria=stopping_criteria,
                     num_beams=5,
                     # do_sample=True,
@@ -556,7 +625,6 @@ class Graph3DLLM(nn.Module):
             output_text = output_text.split(self.end_sym)[0]
             output_text = output_text.replace('  ', ' ').replace(' .', '.').strip()
             output_text = recover_caption(output_text, assigned_ids[i].tolist())
-            #print(output_text)
             output_texts.append(output_text)
         return output_texts
 

@@ -85,6 +85,8 @@ class Model_3DGraphLLM:
 
         checkpoint = torch.load(self.config.pretrained_path, map_location="cpu")
         state_dict = checkpoint["model"]
+
+
         keys_to_delete = []
         for name, param  in state_dict.items():
             if name not in self.model.state_dict():
@@ -128,9 +130,10 @@ class Model_3DGraphLLM:
 
     def prepare_scene_features(self, scene_id):
         if self.feats is not None:
-            scan_ids = set('_'.join(x.split('_')[:2]) for x in self.feats.keys())
+            scan_ids = set('_'.join(x.split('_')[:-1]) for x in self.feats.keys())
         else:
-            scan_ids = set('_'.join(x.split('_')[:2]) for x in self.img_feats.keys())
+            scan_ids = set('_'.join(x.split('_')[:-1]) for x in self.img_feats.keys())
+
         scene_feats = {}
         scene_img_feats = {}
         scene_masks = {}
@@ -142,9 +145,8 @@ class Model_3DGraphLLM:
                 continue
             if scan_id not in self.attributes:
                 continue
-            scene_attr = self.attributes[scan_id]
-            # obj_num = scene_attr['locs'].shape[0]
-            obj_num = self.max_obj_num
+            scene_attr = self.attributes[scan_id] 
+            obj_num = scene_attr['locs'].shape[0]
             obj_ids = scene_attr['obj_ids'] if 'obj_ids' in scene_attr else [_ for _ in range(obj_num)]
             obj_labels = scene_attr['objects'] if 'objects' in scene_attr else [''] * obj_num
             #for i in range(len(obj_ids)):
@@ -192,20 +194,29 @@ class Model_3DGraphLLM:
                         filtered_objects.append(_i)
                 scene_foreground_ids[scan_id] = torch.LongTensor(filtered_objects)
             scene_feat = torch.stack(scene_feat, dim=0)
+            if torch.isnan(scene_feat).any():
+                print("NaN in scene_feat", scan_id)
             scene_img_feat = torch.stack(scene_img_feat, dim=0)
+            if torch.isnan(scene_img_feat).any():
+                print("NaN in scene_img_feat", scan_id)
             scene_mask = torch.tensor(scene_mask, dtype=torch.int)
             scene_feats[scan_id] = scene_feat
             scene_img_feats[scan_id] = scene_img_feat
             scene_masks[scan_id] = scene_mask
-
+            
 
             gnn_shape = 512
             gnn_feat = []
-
+                
             if scan_id in self.feats_edge:
                 gnn_feat = self.feats_edge[scan_id]
+                if len(gnn_feat.shape) != 2:
+                    print(gnn_feat.shape)
+                    gnn_feat = torch.zeros((len(obj_ids)*self.knn, gnn_shape))
             else:
                 gnn_feat = torch.zeros((len(obj_ids)*self.knn, gnn_shape))
+            if torch.isnan(gnn_feat).any():
+                print("NaN in gnn_feat", scan_id)
             scene_gnn_feats[scan_id] = gnn_feat
 
         return scene_feats, scene_img_feats, scene_masks, scene_gnn_feats, scene_foreground_ids
@@ -223,8 +234,8 @@ class Model_3DGraphLLM:
         scene_img_feat = self.scene_img_feats[scene_id] if self.scene_img_feats is not None else torch.zeros((scene_feat.shape[0], self.img_feat_dim))
         scene_mask = self.scene_masks[scene_id] if self.scene_masks is not None else torch.ones(scene_feat.shape[0], dtype=torch.int)
         # assigned_ids = torch.randperm(self.max_obj_num)[:len(scene_locs)]
-        # assigned_ids = torch.randperm(len(scene_locs))
-        assigned_ids = torch.randperm(self.max_obj_num) # !!!
+        assigned_ids = torch.randperm(len(scene_locs))
+        #assigned_ids = torch.randperm(self.max_obj_num) # !!!
         scene_gnn_feat = self.scene_gnn_feats[scene_id]
         scene_foreground_ids = self.scene_foreground_ids[scene_id]
         return scene_id, scene_feat, scene_img_feat, scene_mask, scene_locs, assigned_ids, scene_gnn_feat, scene_foreground_ids
@@ -232,7 +243,7 @@ class Model_3DGraphLLM:
 def main(config):
     # Define scene and load its features
     scene_id = 'scene0435_00'  # Example scene identifier
-    pretrained_path = "outputs/3dgraphllm/ckpt_01_51426.pth"
+    pretrained_path = "demo/3dgraphllm.pth"
     # Initialize the model
     model = Model_3DGraphLLM(config, pretrained_path)
     model.dataset_name = list(model.config.val_file_dict.keys())[0]

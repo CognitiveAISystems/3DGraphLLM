@@ -165,3 +165,6 @@ annotations/
 wandb/
 vicuna-7b-v1.5/
 utils/capeval/
+annotations
+Meta-Llama-3-8B-Instruct
+*.pth

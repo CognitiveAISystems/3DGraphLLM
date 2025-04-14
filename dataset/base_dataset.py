@@ -54,8 +54,8 @@ class BaseDataset(Dataset):
             if scan_id not in self.attributes:
                 continue
             scene_attr = self.attributes[scan_id]
-            # obj_num = scene_attr['locs'].shape[0]
-            obj_num = self.max_obj_num
+            obj_num = scene_attr['locs'].shape[0]
+            #obj_num = self.max_obj_num
             obj_ids = scene_attr['obj_ids'] if 'obj_ids' in scene_attr else [_ for _ in range(obj_num)]
             obj_labels = scene_attr['objects'] if 'objects' in scene_attr else [''] * obj_num
             #for i in range(len(obj_ids)):
@@ -137,8 +137,8 @@ class BaseDataset(Dataset):
         scene_img_feat = self.scene_img_feats[scene_id] if self.scene_img_feats is not None else torch.zeros((scene_feat.shape[0], self.img_feat_dim))
         scene_mask = self.scene_masks[scene_id] if self.scene_masks is not None else torch.ones(scene_feat.shape[0], dtype=torch.int)
         # assigned_ids = torch.randperm(self.max_obj_num)[:len(scene_locs)]
-        # assigned_ids = torch.randperm(len(scene_locs))
-        assigned_ids = torch.randperm(self.max_obj_num) # !!!
+        assigned_ids = torch.randperm(len(scene_locs))
+        # assigned_ids = torch.randperm(self.max_obj_num) # !!!
         scene_gnn_feat = self.scene_gnn_feats[scene_id]
         scene_foreground_ids = self.scene_foreground_ids[scene_id]
         return scene_id, scene_feat, scene_img_feat, scene_mask, scene_locs, assigned_ids, scene_gnn_feat, scene_foreground_ids

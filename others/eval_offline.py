@@ -12,7 +12,7 @@ from pycocoevalcap.cider.cider import Cider
 #from pycocoevalcap.spice.spice import Spice
 from pycocoevalcap.tokenizer.ptbtokenizer import PTBTokenizer
 
-output_dir = 'outputs/chatscene-reproducing-bs8-rerun'
+output_dir = 'outputs/3dgraphllm_2e-5_ep6'
 
 tokenizer = PTBTokenizer()
 scorers = [
@@ -24,12 +24,12 @@ scorers = [
 ]
 
 
-prefix = 'preds_epoch2_step0'
+prefix = 'preds_epoch4_step0'
 
 all_val_scores = {}
 
 #for task in ['scanqa', 'scanrefer', 'scan2cap', 'sqa3d', 'multi3dref']:
-for task in ['sqa3d']:
+for task in ['scanrefer']:
     save_preds = []
     for filename in os.listdir(output_dir):
         if filename.startswith(prefix) and task in filename:

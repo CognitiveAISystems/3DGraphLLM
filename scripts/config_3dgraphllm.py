@@ -29,8 +29,8 @@ model = dict(
     pos_dim=128,
     encoder_num_layers=3,
     low_resource=False,
-    system_path="prompts/system.txt",
-    instruction_path="prompts/instruction.txt",
+    system_path="./prompts/system.txt",
+    instruction_path="./prompts/instruction.txt",
     max_txt_len=64,
     end_sym="</s>",
     role=("USER", "ASSISTANT"),
@@ -40,7 +40,7 @@ model = dict(
     train_emb=True,
     train_img_proj=True,
     no_obj=False,
-    max_obj_num=100,
+    max_obj_num=150,
     bidirection=False,
     add_pos_emb=False,
     feat_fusion=False,
@@ -48,11 +48,12 @@ model = dict(
     use_objid=True,
     use_location_token=False,
     knn=2,
-    gt_pretrain=False
+    bbox_embed=False,
+    gt_pretrain=False,
+    nms=True,
+    nn_distance=True,
+    max_knn=2
 )
-
-debug=False
-device = "cuda"
 
 lora = dict(
     lora_target_modules=[
@@ -68,3 +69,48 @@ lora = dict(
     lora_alpha=16,
     lora_dropout=0.05
 )
+
+optimizer = dict(
+    opt="adamW",
+    lr=5e-6,
+    opt_betas=[0.9, 0.999],  # default
+    weight_decay=0.02,
+    scaler_enable=False,
+    max_grad_norm=0.01,  # requires a positive float, use -1 to disable
+    # use a different lr for some modules, e.g., larger lr for new modules
+    different_lr=dict(
+        enable=False,
+        module_names=["model.embed_tokens"],
+        lr=[5e-4],
+        wd=[0.02]
+    ),
+)
+
+scheduler = dict(sched="cosine", epochs=3, min_lr_multi=0.01, warmup_epochs=0.1)
+
+evaluate = False
+
+# ========================= wandb ==========================
+wandb = dict(
+    enable=False,
+    entity="anonym",  # username or team name to store the runs, see https://docs.wandb.ai/ref/python/init
+    project="3DGraphLLM",
+)
+dist_url = "env://"
+device = "cuda"
+
+# ========================= others ==========================
+output_dir = "./llama3-8b-gt-pretrain-2-3rscan"  # output dir
+resume = False  # if True, load optimizer and scheduler states as well
+debug = False
+log_freq = 20
+# eval_freq = 500
+seed = 42
+
+save_latest = False
+do_save = True
+auto_resume = True
+pretrained_path = ""
+img_projector_path = ""
+
+debug=False

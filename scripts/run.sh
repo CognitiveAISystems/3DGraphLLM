@@ -16,7 +16,7 @@ no_obj=False
 input_dim=1024 # 1024
 bidirection=False
 different_lr=False
-max_obj_num=100
+max_obj_num=150
 lora_r=16
 lora_alpha=16
 add_pos_emb=False
@@ -31,9 +31,9 @@ use_location_token=False
 llama_model_path="./Meta-Llama-3-8B-Instruct"
 
 train_tag="scanrefer#obj_align#nr3d_caption#scan2cap#scanqa#sqa3d#multi3dref"
-val_tag="scan2cap#scanrefer#scanqa#sqa3d#multi3dref"
+val_tag="scanrefer#scan2cap#scanqa#sqa3d#multi3dref"
 
-evaluate=False
+evaluate=True
 debug=False
 if [ $evaluate = "True" ]; then
     enable_wandb=False
@@ -49,7 +49,7 @@ fi
 
 tag="${train_tag}__${val_tag}__${other_info}"
 
-pretrained_path=""
+pretrained_path="./demo/3dgraphllm.pth"
 
 OUTPUT_DIR=outputs/3dgraphllm_2e-5_ep6
 mkdir -p ${OUTPUT_DIR}
@@ -87,5 +87,5 @@ python tasks/train.py \
     model.fuse_with_id "$fuse_with_id" \
     model.llama_model_path "$llama_model_path" \
     model.use_location_token "$use_location_token" \
-    model.gt_pretrain True
+    model.gt_pretrain False
 
