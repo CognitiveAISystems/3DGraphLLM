@@ -4,6 +4,8 @@
 
 - We've provided preprocessed VL-SAT features for semantic relations between objects as well as additional text annotations in [Yandex Disk](https://disk.yandex.ru/d/LpPJgHg8Qg6BpA)
 
+- We've provided VL-SAT features for fully-connected graphs with semantic relations between objects in [Yandex Disk](https://disk.yandex.ru/d/LpPJgHg8Qg6BpA) (output_vlsat.zip)
+
 ## Prepare data
 
 - Download the ScanNet dataset by following the [ScanNet instructions](https://github.com/ScanNet/ScanNet).
@@ -28,3 +30,5 @@
     - We followed [OpenScene](https://github.com/pengsongyou/openscene)'s code to calculate the mapping between 3D points and 2D image pixels. This allows each object to be projected onto multi-view images. Based on the projected masks on the images, we extract and merge DINOv2 features from multi-view images for each object. 
 
     - [TODO] Detailed implementation will be released.
+
+- To obtain connections based on the N nearest neighbors for each object, filter the fully connected graphs with VLSAT features. To achieve this, run the ```prepare_filtered_gnn_data.py``` script after updating the paths to the directories containing the fully connected graphs for each scene, the object attributes, and the ScanNet splits. The number of nearest neighbors can be adjusted by modifying the ```KNN``` parameter at the beginning of the ```prepare_filtered_gnn_data.py``` script.
