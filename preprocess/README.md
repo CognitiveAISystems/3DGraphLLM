@@ -31,4 +31,6 @@
 
     - [TODO] Detailed implementation will be released.
 
-- To obtain connections based on the N nearest neighbors for each object, filter the fully connected graphs with VLSAT features. To achieve this, run the ```prepare_filtered_gnn_data.py``` script after updating the paths to the directories containing the fully connected graphs for each scene, the object attributes, and the ScanNet splits. The number of nearest neighbors can be adjusted by modifying the ```KNN``` parameter at the beginning of the ```prepare_filtered_gnn_data.py``` script.
+- Obtain connections based on the N nearest neighbors for each object, filter the fully connected graphs with VLSAT features for Mask3D segmentation. To achieve this, run the ```prepare_filtered_mask3d_gnn_data.py``` script after updating the paths to the directories containing the fully connected graphs for each scene, the object attributes, and the ScanNet splits. The number of nearest neighbors can be adjusted by modifying the ```KNN``` parameter at the beginning of the ```prepare_filtered_mask3d_gnn_data.py``` script.
+
+- Obtain connections based on the N nearest neighbors for each object, filter the fully connected graphs with VLSAT features for GT segmentation. To achieve this, run the ```prepare_gnn_data.py``` script after updating the paths to the directories containing the fully connected graphs for each scene, the object attributes, and the ScanNet splits. The number of nearest neighbors can be adjusted by modifying the ```KNN``` parameter at the beginning of the ```prepare_gnn_data.py``` script.
