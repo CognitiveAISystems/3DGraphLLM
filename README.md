@@ -11,6 +11,8 @@ In this work, we propose 3DGraphLLM, a method for constructing a learnable repre
 
 ## News
 
+[2025.6] We are pleased to inform you that our paper has been accepted for poster presentation at ICCV 2025! 🎉
+
 [2024.12] We release 3DGraphLLM pre-training on GT instance segmentation scene graphs
 
 [2024.12] We release 3DGraphLLM [paper](https://arxiv.org/abs/2412.18450) [code](https://github.com/CognitiveAISystems/3DGraphLLM)
@@ -23,8 +25,8 @@ In this work, we propose 3DGraphLLM, a method for constructing a learnable repre
   |:----:	|:---------:	|:-------:	|:------:	|:------:	|:---------:	|:----------:	|:------------:	|:------:	|:-----:	|
   |      	|  Acc@0.25 	| Acc@0.5 	|    F1@0.25   	| F1@0.5 	|  CIDEr@0.5 	| B-4@0.5 	| CIDEr 	| B-4 	|    EM  	|
   | [Chat-Scene](https://github.com/ZzZZCHS/Chat-Scene/tree/dev) 	|    55.5   	|   50.2  	|  57.1 	|  52.3  	|    77.1  	|    36.3    	|     **87.7**      	|    **14.3**  	|   <ins>54.6</ins>   	|
-  | <ins>3DGraphLLM Vicuna-1.5 </ins> 	|   <ins>57.0</ins>    	|  <ins>51.3</ins>  	|  <ins>60.1</ins>  	|  <ins>55.4</ins>  	|   <ins>81.2</ins>    	|    <ins>36.3</ins>    	|    <ins>87.6</ins>     	|  12.1 	| 53.1  	|
-   **3DGraphLLM LLAMA3-8B**	|   **60.2**    	|  **54.6**   	|  **63.0**  	|  **58.2**  	|   **82.9**    	|    **37.8**    	|     83.1     	|  <ins>12.5</ins>   	| **55.2**  	|
+  | <ins>3DGraphLLM Vicuna-1.5 </ins> 	|   <ins>58.6</ins>    	|  <ins>53.0</ins>  	|  <ins>61.9</ins>  	|  <ins>57.3</ins>  	|   <ins>79.2</ins>    	|    <ins>34.7</ins>    	|    <ins>91.2</ins>     	|  13.7 	| 55.1  	|
+   **3DGraphLLM LLAMA3-8B**	|   **62.4**    	|  **56.6**   	|  **64.7**  	|  **59.9**  	|   **81.0**    	|    **36.5**    	|     88.8     	|  <ins>15.9</ins>   	| **55.9**  	|
 
 
 ## 🔨 Preparation
