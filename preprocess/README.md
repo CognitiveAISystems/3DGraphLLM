@@ -1,6 +1,6 @@
 ## Skip the data preparation
 
-- Chat-Scene has provided all the prepared data in [Google Drive](https://drive.google.com/drive/folders/1iwVFUkvveehvwGcAnJK3EwLxBt5ggR2c?usp=sharing). Simply download the files and place them in the annotations/ directory. You’ll then be ready to run and test the code.
+- Chat-Scene has provided all the prepared data in [HuggingFace](https://huggingface.co/datasets/ZzZZCHS/Chat-Scene/tree/main/annotations). Simply download the files and place them in the annotations/ directory. You’ll then be ready to run and test the code.
 
 - We've provided preprocessed VL-SAT features for semantic relations between objects as well as additional text annotations in [Yandex Disk](https://disk.yandex.ru/d/LpPJgHg8Qg6BpA)
 
