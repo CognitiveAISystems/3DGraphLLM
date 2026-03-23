@@ -214,24 +214,14 @@ def evaluate(
     cosine_scores, l2_distances = [], []
     save_preds = []
     logger.info(f"batch-size={val_loader.batch_size} length(#batches)={len(val_loader)}")
-    for i, batch in tqdm(enumerate(val_loader)):
+    for i, batch in tqdm(enumerate(val_loader), total=len(val_loader)):
         for k in batch.keys():
             if type(batch[k]) == torch.Tensor:
                 batch[k] = batch[k].to(device)
         with torch.no_grad():
             pred = model(**batch, is_eval=True)
-        # if "target_captions" in batch:
-        #     cosine_scores.append(pred["cosine_score"])
-        #     l2_distances.append(pred["l2_dis"])
 
         if "custom_prompt" in batch:
-            # if len(batch["ref_captions"][0]) > 0:
-            #     target = batch["ref_captions"]
-            #     prompt = batch["custom_prompt"]
-            #     tmp_pred = [p.replace("\n", " ").strip() for p in pred]
-            #     tmp_target = ['\n'.join(p) for p in target]
-            #     if i % sample_freq == 0:
-            #         logger.info(f"\n[Prompt]\n{prompt[0]}\n[Pred]\n{tmp_pred[0]}\n[Target(s)]\n{tmp_target[0]}")
             batch_size = len(pred)
             for bi in range(batch_size):
                 scene_id = batch["scene_id"][bi]
@@ -251,31 +241,35 @@ def evaluate(
                     "ref_captions": batch["ref_captions"][bi],
                     "type_info": type_info
                 })
-            # if i % sample_freq == 0:
-            #     print(save_preds[-1])
 
-    if len(save_preds) > 0:
-        save_preds = sorted(save_preds, key=lambda x: f"{x['scene_id']}_{x['gt_id']:03}_{x['qid']}")
-        # with open(os.path.join(config.output_dir, f"preds_epoch{epoch}_step{global_step}_rank{get_rank()}_{eval_name}.json"),
-        with open(os.path.join(config.output_dir, f"preds_epoch4_step{global_step}_rank{get_rank()}_{eval_name}.json"),
-                  "w") as f:
-            json.dump(save_preds, f, indent=4)
+    if config.gpu_num > 1:
+        if len(save_preds) > 0:
+            save_preds = sorted(save_preds, key=lambda x: f"{x['scene_id']}_{x['gt_id']:03}_{x['qid']}")
+            with open(os.path.join(config.output_dir, f"preds_{eval_name}_rank{get_rank()}.json"), "w") as f:
+                json.dump(save_preds, f, indent=4)
 
-    #dist.barrier()
-    if is_main_process():
-        save_preds = []
-        for rank in range(config.gpu_num):
-            path = os.path.join(config.output_dir, f"preds_epoch{epoch}_step{global_step}_rank{rank}_{eval_name}.json")
-            if os.path.exists(path):
-                preds = json.load(open(path, "r"))
-                save_preds += preds
-                os.remove(path)
-        save_preds = sorted(save_preds, key=lambda x: f"{x['scene_id']}_{x['gt_id']:03}_{x['qid']}")
-        with open(os.path.join(config.output_dir, f"preds_epoch{epoch}_step{global_step}_{eval_name}.json"), "w") as f:
-            json.dump(save_preds, f, indent=4)
+        dist.barrier()
+        
+        if is_main_process():
+            save_preds = []
+            for rank in range(config.gpu_num):
+                path = os.path.join(config.output_dir, f"preds_{eval_name}_rank{rank}.json")
+                if os.path.exists(path):
+                    preds = json.load(open(path, "r"))
+                    save_preds += preds
+                    os.remove(path)
+            save_preds = sorted(save_preds, key=lambda x: f"{x['scene_id']}_{x['gt_id']:03}_{x['qid']}")
+            with open(os.path.join(config.output_dir, f"preds_{eval_name}.json"), "w") as f:
+                json.dump(save_preds, f, indent=4)
+    
+    else:
+        if len(save_preds) > 0:
+            save_preds = sorted(save_preds, key=lambda x: f"{x['scene_id']}_{x['gt_id']:03}_{x['qid']}")
+            with open(os.path.join(config.output_dir, f"preds_{eval_name}.json"), "w") as f:
+                json.dump(save_preds, f, indent=4)
 
     val_scores = {}
-    if is_main_process() and len(save_preds) > 0:
+    if (is_main_process() or config.gpu_num == 1) and len(save_preds) > 0:
         if eval_name == 'scanqa':
             val_scores = calc_scanqa_score(save_preds, tokenizer, scorers, config)
         elif eval_name == 'scanrefer':
@@ -291,35 +285,12 @@ def evaluate(
         elif eval_name == "scanrefer_location":
             val_scores = calc_scanrefer_location_score(save_preds, config)
         elif eval_name == "multi3dref_location":
-            val_score = calc_multi3dref_location_score(save_preds, config)
-        # else:
-        #     raise NotImplementedError
-            # tmp_preds = {}
-            # tmp_targets = {}
-            # acc = 0
-            # print("Total samples:", len(save_preds))
-            # for i, output in enumerate(save_preds):
-            #     item_id = f"{output['scene_id']}_{output['gt_id']}_{output['qid']}_{i}"
-            #     pred = output["pred"]
-            #     pred = clean_answer(pred)
-            #     ref_captions = [clean_answer(caption) for caption in output['ref_captions']]
-            #     if pred in ref_captions:
-            #         acc += 1
-            #     tmp_preds[item_id] = [{'caption': pred}]
-            #     ref_captions = [p.replace("\n", " ").strip() for p in ref_captions]
-            #     tmp_targets[item_id] = [{'caption': caption} for caption in ref_captions]
-            # tmp_preds = tokenizer.tokenize(tmp_preds)
-            # tmp_targets = tokenizer.tokenize(tmp_targets)
-            # acc = acc / len(save_preds)
-            # val_scores[f"[{eval_name}] Acc"] = acc
-            # for scorer, method in scorers:
-            #     score, scores = scorer.compute_score(tmp_targets, tmp_preds)
-            #     if type(method) == list:
-            #         for sc, scs, m in zip(score, scores, method):
-            #             val_scores[f"[{eval_name}] {m}"] = sc
-            #     else:
-            #         val_scores[f"[{eval_name}] {method}"] = score
+            val_scores = calc_multi3dref_location_score(save_preds, config)
+        for k in val_scores.keys():
+            val_scores[k] *= 100
         print(json.dumps(val_scores, indent=4))
+        with open(os.path.join(config.output_dir, f"scores_{eval_name}.json"), "w") as f:
+            json.dump(val_scores, f, indent=4)
     return val_scores
 
 
